@@ -1,0 +1,23 @@
+CREATE TABLE questions(
+  id SERIAL PRIMARY KEY,
+  question TEXT NOT NULL
+);
+
+CREATE TABLE answers(
+  id SERIAL PRIMARY KEY,
+  question_id INT REFERENCES questions(id) ON DELETE CASCADE,
+  answer TEXT NOT NULL,
+  is_correct BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE students(
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+CREATE TABLE results(
+  id SERIAL PRIMARY KEY,
+  student_id INT REFERENCES students(id) ON DELETE CASCADE,
+  score INT NOT NULL,
+  total INT NOT NULL
+);

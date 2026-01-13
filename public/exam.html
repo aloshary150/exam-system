@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8" />
+<title>الامتحان</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="card">
+<form id="examForm"></form>
+<p id="result"></p>
+</div>
+<script>
+const studentName = localStorage.getItem("name");
+if (!studentName) {
+  alert("يرجى إدخال الاسم أولاً");
+  location.href = "/";
+}
+
+fetch("/api/questions/all")
+  .then(res => res.json())
+  .then(questions => {
+    const form = document.getElementById("examForm");
+    questions.forEach(q => {
+      let html = `<p><b>${q.question}</b></p>`;
+      q.answers.forEach(a => {
+        html += `
+          <label>
+            <input type="radio" name="q${q.id}" value="${a.id}" required />
+            ${a.answer}
+          </label><br />
+        `;
+      });
+      form.innerHTML += html;
+    });
+    form.innerHTML += `<button type="submit">إرسال الامتحان</button>`;
+
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const answers = {};
+      document.querySelectorAll("input[type=radio]:checked").forEach(i => {
+        answers[i.name.replace("q", "")] = i.value;
+      });
+
+      const res = await fetch("/api/exam/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentName, answers }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      document.getElementById("result").innerText = `النتيجة: ${data.score} / ${data.total}`;
+    };
+  });
+</script>
+</body>
+</html>

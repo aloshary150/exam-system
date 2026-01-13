@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8" />
+<title>لوحة تحكم المعلم</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="card">
+<h3>تسجيل دخول المعلم</h3>
+<input id="password" type="password" placeholder="كلمة السر" />
+<button onclick="login()">دخول</button>
+<div id="panel" style="display:none; margin-top:20px;">
+<h4>إضافة سؤال جديد</h4>
+<input id="question" placeholder="السؤال" /><br />
+<input id="a0" placeholder="الإجابة 1" /> <input type="radio" name="correct" value="0" /> صحيحة<br />
+<input id="a1" placeholder="الإجابة 2" /> <input type="radio" name="correct" value="1" /> صحيحة<br />
+<input id="a2" placeholder="الإجابة 3" /> <input type="radio" name="correct" value="2" /> صحيحة<br />
+<input id="a3" placeholder="الإجابة 4" /> <input type="radio" name="correct" value="3" /> صحيحة<br />
+<button onclick="addQuestion()">إضافة السؤال</button>
+<p id="message"></p>
+</div>
+</div>
+<script>
+function login() {
+  const pass = document.getElementById("password").value;
+  fetch("/api/teacher/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: pass }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        document.getElementById("panel").style.display = "block";
+        document.getElementById("password").style.display = "none";
+      } else {
+        alert("كلمة السر خاطئة");
+      }
+    });
+}
+
+function addQuestion() {
+  const q = document.getElementById("question").value.trim();
+  const answers = [
+    document.getElementById("a0").value.trim(),
+    document.getElementById("a1").value.trim(),
+    document.getElementById("a2").value.trim(),
+    document.getElementById("a3").value.trim(),
+  ];
+  const radios = document.getElementsByName("correct");
+  let correctIndex = -1;
+  for (const r of radios) {
+    if (r.checked) correctIndex = parseInt(r.value);
+  }
+  if (!q || answers.some(a => !a) || correctIndex === -1) {
+    alert("يرجى ملء كل الحقول وتحديد الإجابة الصحيحة");
+    return;
+  }
+  fetch("/api/teacher/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: q, answers, correctIndex }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        document.getElementById("message").innerText = "تم إضافة السؤال بنجاح";
+        document.getElementById("question").value = "";
+        ["a0", "a1", "a2", "a3"].forEach(id => (document.getElementById(id).value = ""));
+        radios.forEach(r => (r.checked = false));
+      } else {
+        alert("حدث خطأ أثناء الإضافة");
+      }
+    });
+}
+</script>
+</body>
+</html>

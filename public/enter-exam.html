@@ -1,0 +1,26 @@
+<h2>اختر امتحان</h2>
+
+<select id="exams"></select>
+<br><br>
+<button onclick="start()">بدء الامتحان</button>
+
+<script>
+async function load() {
+  const res = await fetch("/api/exam/list");
+  const exams = await res.json();
+
+  exams.forEach(e => {
+    const opt = document.createElement("option");
+    opt.value = e.id;
+    opt.textContent = `${e.subject} - الصف ${e.grade}`;
+    exams.appendChild(opt);
+  });
+}
+
+function start() {
+  const id = exams.value;
+  location.href = `exam.html?exam=${id}`;
+}
+
+load();
+</script>

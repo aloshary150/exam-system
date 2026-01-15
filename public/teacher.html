@@ -6,66 +6,57 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <header>لوحة تحكم المعلم</header>
   <div class="container">
-    <h2>لوحة تحكم المعلم</h2>
-
     <input id="password" placeholder="كلمة سر المعلم" type="password" />
-
-    <h3>إدارة الامتحانات</h3>
+    <button onclick="loadExams()">تحميل الامتحانات</button>
+    <h3>الامتحانات</h3>
     <ul id="examList"></ul>
-
     <hr />
-
-    <h3>إضافة سؤال لامتحان</h3>
+    <h3>إضافة سؤال</h3>
     <input id="examId" placeholder="رقم الامتحان" readonly />
     <input id="q" placeholder="السؤال" />
     <input id="a1" placeholder="إجابة 1" />
     <input id="a2" placeholder="إجابة 2" />
     <input id="a3" placeholder="إجابة 3" />
     <input id="a4" placeholder="إجابة 4" />
-    <input
-      id="correct"
-      type="number"
-      placeholder="رقم الإجابة الصحيحة (0-3)"
-      min="0"
-      max="3"
-    />
+    <input id="correct" type="number" placeholder="رقم الإجابة الصحيحة (0-3)" min="0" max="3" />
     <button onclick="addQuestion()">إضافة سؤال</button>
-
     <hr />
-
-    <h3>عرض نتائج الطلاب</h3>
+    <h3>نتائج الطلاب</h3>
     <button onclick="loadResults()">عرض النتائج</button>
     <ul id="results"></ul>
+    <p id="msg" class="error"></p>
   </div>
-
   <script>
     const passwordInput = document.getElementById("password");
     const examList = document.getElementById("examList");
     const examIdInput = document.getElementById("examId");
     const resultsList = document.getElementById("results");
-
-    passwordInput.addEventListener("input", loadExams);
-
+    const msg = document.getElementById("msg");
+    function clearLists() {
+      examList.innerHTML = "";
+      resultsList.innerHTML = "";
+      msg.textContent = "";
+    }
     async function loadExams() {
+      clearLists();
       const password = passwordInput.value.trim();
       if (!password) {
-        examList.innerHTML = "";
+        msg.textContent = "يرجى إدخال كلمة السر";
         return;
       }
-
       try {
         const res = await fetch("/api/exam/list");
         const exams = await res.json();
-
-        examList.innerHTML = "";
         exams.forEach((exam) => {
           const li = document.createElement("li");
           li.textContent = `${exam.subject} - الصف ${exam.grade} - مدة: ${exam.duration} دقيقة`;
           const btnDelete = document.createElement("button");
           btnDelete.textContent = "حذف";
           btnDelete.style.marginLeft = "10px";
-          btnDelete.onclick = async () => {
+          btnDelete.onclick = async (e) => {
+            e.stopPropagation();
             if (
               confirm(`هل أنت متأكد من حذف الامتحان: ${exam.subject} - الصف ${exam.grade}؟`)
             ) {
@@ -81,23 +72,19 @@
               }
             }
           };
-
           li.onclick = () => {
             examIdInput.value = exam.id;
-            alert(
-              `تم اختيار الامتحان: ${exam.subject} - الصف ${exam.grade}\nرقم الامتحان تم تعبئته`
-            );
+            alert(`تم اختيار الامتحان: ${exam.subject} - الصف ${exam.grade}\nرقم الامتحان تم تعبئته`);
           };
-
           li.appendChild(btnDelete);
           examList.appendChild(li);
         });
       } catch {
-        examList.innerHTML = "خطأ في تحميل الامتحانات";
+        msg.textContent = "خطأ في تحميل الامتحانات";
       }
     }
-
     async function addQuestion() {
+      msg.textContent = "";
       const password = passwordInput.value.trim();
       const examId = examIdInput.value.trim();
       const question = document.getElementById("q").value.trim();
@@ -105,4 +92,61 @@
         document.getElementById("a1").value.trim(),
         document.getElementById("a2").value.trim(),
         document.getElementById("a3").value.trim(),
-        document.getElementById("a4").value
+        document.getElementById("a4").value.trim(),
+      ];
+      const correctIndex = parseInt(document.getElementById("correct").value);
+      if (!password || !examId || !question || answers.some((a) => !a) || isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+        msg.textContent = "يرجى تعبئة جميع الحقول بشكل صحيح";
+        return;
+      }
+      try {
+        const res = await fetch("/api/teacher/add-question", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password, examId, question, answers, correctIndex }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("تمت إضافة السؤال");
+          document.getElementById("q").value = "";
+          document.getElementById("a1").value = "";
+          document.getElementById("a2").value = "";
+          document.getElementById("a3").value = "";
+          document.getElementById("a4").value = "";
+          document.getElementById("correct").value = "";
+        } else {
+          msg.textContent = data.message || data.error;
+        }
+      } catch (err) {
+        msg.textContent = "حدث خطأ أثناء الإضافة";
+      }
+    }
+    async function loadResults() {
+      resultsList.innerHTML = "";
+      msg.textContent = "";
+      const password = passwordInput.value.trim();
+      if (!password) {
+        msg.textContent = "يرجى إدخال كلمة السر";
+        return;
+      }
+      try {
+        const res = await fetch("/api/teacher/results", {
+          headers: { password },
+        });
+        const results = await res.json();
+        if (results.length === 0) {
+          resultsList.textContent = "لا توجد نتائج بعد";
+          return;
+        }
+        results.forEach((r) => {
+          const li = document.createElement("li");
+          li.textContent = `${r.name} - مادة: ${r.subject} - النتيجة: ${r.score} / ${r.total}`;
+          resultsList.appendChild(li);
+        });
+      } catch {
+        msg.textContent = "خطأ في تحميل النتائج";
+      }
+    }
+  </script>
+</body>
+</html>

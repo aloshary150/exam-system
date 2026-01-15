@@ -1,33 +1,31 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>نظام الامتحانات</title>
-  <style>
-    body { font-family: Arial; text-align: center; margin-top: 100px; }
-    select, button { padding: 10px; font-size: 16px; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-<h2>مرحبًا بك</h2>
-
-<select id="action">
-  <option value="">-- اختر --</option>
-  <option value="create">إنشاء امتحان</option>
-  <option value="enter">دخول امتحان</option>
-</select>
-
-<br><br>
-<button onclick="go()">متابعة</button>
-
-<script>
-function go() {
-  const v = document.getElementById("action").value;
-  if (v === "create") location.href = "create-exam.html";
-  if (v === "enter") location.href = "enter-exam.html";
-}
-</script>
-
+  <header>نظام الامتحانات</header>
+  <div class="container">
+    <h2>مرحبًا بك في نظام الامتحانات</h2>
+    <select id="action">
+      <option value="">-- اختر --</option>
+      <option value="create">إنشاء امتحان</option>
+      <option value="enter">دخول امتحان</option>
+      <option value="teacher">لوحة تحكم المعلم</option>
+    </select>
+    <br /><br />
+    <button onclick="go()">متابعة</button>
+  </div>
+  <script>
+    function go() {
+      const v = document.getElementById("action").value;
+      if (v === "create") location.href = "create-exam.html";
+      else if (v === "enter") location.href = "enter-exam.html";
+      else if (v === "teacher") location.href = "teacher.html";
+      else alert("اختر خيارًا");
+    }
+  </script>
 </body>
 </html>

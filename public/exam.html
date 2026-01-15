@@ -1,60 +1,121 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<title>الامتحان</title>
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8" />
+  <title>الامتحان</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="card">
-<form id="examForm"></form>
-<p id="result"></p>
-</div>
-<script>
-const studentName = localStorage.getItem("name");
-if (!studentName) {
-  alert("يرجى إدخال الاسم أولاً");
-  location.href = "/";
-}
-
-fetch("/api/questions/all")
-  .then(res => res.json())
-  .then(questions => {
-    const form = document.getElementById("examForm");
-    questions.forEach(q => {
-      let html = `<p><b>${q.question}</b></p>`;
-      q.answers.forEach(a => {
-        html += `
-          <label>
-            <input type="radio" name="q${q.id}" value="${a.id}" required />
-            ${a.answer}
-          </label><br />
-        `;
-      });
-      form.innerHTML += html;
-    });
-    form.innerHTML += `<button type="submit">إرسال الامتحان</button>`;
-
-    form.onsubmit = async e => {
-      e.preventDefault();
-      const answers = {};
-      document.querySelectorAll("input[type=radio]:checked").forEach(i => {
-        answers[i.name.replace("q", "")] = i.value;
-      });
-
-      const res = await fetch("/api/exam/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentName, answers }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        alert(data.error);
+  <div class="exam-container">
+    <div class="exam-header">
+      <h1 id="subject">اسم المادة</h1>
+      <h3 id="grade">الصف</h3>
+      <div class="timer" id="timer">الوقت المتبقي: --:--</div>
+    </div>
+    <form id="examForm">
+      <!-- الأسئلة ستدخل هنا -->
+    </form>
+    <button onclick="submitExam()">إرسال الامتحان</button>
+    <p id="resultMsg" class="error"></p>
+  </div>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const examId = urlParams.get("examId");
+    const studentName = localStorage.getItem("studentName");
+    const examForm = document.getElementById("examForm");
+    const subjectEl = document.getElementById("subject");
+    const gradeEl = document.getElementById("grade");
+    const timerEl = document.getElementById("timer");
+    const resultMsg = document.getElementById("resultMsg");
+    let examDuration = 0; // بالدقائق
+    let timerInterval;
+    async function loadExam() {
+      if (!examId || !studentName) {
+        alert("خطأ في بيانات الامتحان أو اسم الطالب");
+        location.href = "enter-exam.html";
         return;
       }
-      document.getElementById("result").innerText = `النتيجة: ${data.score} / ${data.total}`;
-    };
-  });
-</script>
+      const res = await fetch(`/api/exam/questions/${examId}`);
+      const data = await res.json();
+      if (!data || !data.questions || data.questions.length === 0) {
+        alert("لا يوجد أسئلة لهذا الامتحان");
+        location.href = "enter-exam.html";
+        return;
+      }
+      subjectEl.textContent = data.examInfo.subject || "المادة";
+      gradeEl.textContent = `الصف ${data.examInfo.grade || ""}`;
+      examDuration = data.examInfo.duration || 10;
+      for (let i = 0; i < data.questions.length; i++) {
+        const q = data.questions[i];
+        const div = document.createElement("div");
+        div.classList.add("question-block");
+        const p = document.createElement("p");
+        p.textContent = `${i + 1}. ${q.question}`;
+        div.appendChild(p);
+        const answersDiv = document.createElement("div");
+        answersDiv.classList.add("answers");
+        q.answers.forEach((ans, idx) => {
+          const label = document.createElement("label");
+          label.innerHTML = `
+            <input type="radio" name="q${q.id}" value="${ans.id}" required />
+            ${ans.answer}
+          `;
+          answersDiv.appendChild(label);
+        });
+        div.appendChild(answersDiv);
+        examForm.appendChild(div);
+      }
+      startTimer(examDuration * 60);
+    }
+    function startTimer(seconds) {
+      let timeLeft = seconds;
+      timerEl.textContent = `الوقت المتبقي: ${formatTime(timeLeft)}`;
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `الوقت المتبقي: ${formatTime(timeLeft)}`;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          alert("انتهى الوقت! سيتم إرسال الامتحان تلقائيًا.");
+          submitExam();
+        }
+      }, 1000);
+    }
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+    }
+    async function submitExam() {
+      clearInterval(timerInterval);
+      resultMsg.textContent = "";
+      const answers = {};
+      for (const el of examForm.elements) {
+        if (el.checked && el.name.startsWith("q")) {
+          answers[el.name.substring(1)] = el.value;
+        }
+      }
+      if (Object.keys(answers).length !== examForm.querySelectorAll(".question-block").length) {
+        resultMsg.textContent = "يرجى الإجابة على جميع الأسئلة";
+        return;
+      }
+      try {
+        const res = await fetch("/api/exam/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ examId, studentName, answers }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`تم الإرسال بنجاح. نتيجتك: ${data.score} من ${data.total}`);
+          location.href = "index.html";
+        } else {
+          resultMsg.textContent = data.message || data.error;
+        }
+      } catch {
+        resultMsg.textContent = "حدث خطأ أثناء الإرسال";
+      }
+    }
+    loadExam();
+  </script>
 </body>
 </html>

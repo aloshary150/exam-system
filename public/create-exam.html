@@ -1,27 +1,49 @@
-<h2>إنشاء امتحان</h2>
-
-<input placeholder="كلمة سر المعلم" id="password"><br><br>
-<input placeholder="اسم المادة" id="subject"><br><br>
-<input placeholder="الصف" id="grade"><br><br>
-<input type="number" placeholder="عدد الأسئلة" id="total"><br><br>
-
-<button onclick="create()">إنشاء</button>
-
-<script>
-async function create() {
-  const res = await fetch("/api/teacher/create-exam", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      password: password.value,
-      subject: subject.value,
-      grade: grade.value,
-      totalQuestions: total.value
-    })
-  });
-
-  const data = await res.json();
-  alert("تم إنشاء الامتحان");
-  location.href = "enter-exam.html";
-}
-</script>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>إنشاء امتحان</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>إنشاء امتحان</header>
+  <div class="container">
+    <input id="password" placeholder="كلمة سر المعلم" type="password" />
+    <input id="subject" placeholder="اسم المادة" />
+    <input id="grade" placeholder="الصف" />
+    <input id="total" type="number" placeholder="عدد الأسئلة" />
+    <input id="duration" type="number" placeholder="مدة الامتحان بالدقائق" />
+    <button onclick="create()">إنشاء</button>
+    <p id="msg" class="error"></p>
+  </div>
+  <script>
+    async function create() {
+      const password = document.getElementById("password").value.trim();
+      const subject = document.getElementById("subject").value.trim();
+      const grade = document.getElementById("grade").value.trim();
+      const totalQuestions = parseInt(document.getElementById("total").value);
+      const duration = parseInt(document.getElementById("duration").value);
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
+      if (!password || !subject || !grade || !totalQuestions || !duration) {
+        msg.textContent = "يرجى تعبئة جميع الحقول";
+        return;
+      }
+      const res = await fetch("/api/teacher/create-exam", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, subject, grade, totalQuestions, duration }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("تم إنشاء الامتحان، رقم الامتحان: " + data.id);
+        localStorage.setItem("teacherPassword", password);
+        localStorage.setItem("createdExamId", data.id);
+        location.href = "teacher.html";
+      } else {
+        msg.textContent = data.message || data.error;
+      }
+    }
+  </script>
+</body>
+</html>

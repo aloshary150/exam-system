@@ -1,0 +1,27 @@
+<h2>إنشاء امتحان</h2>
+
+<input placeholder="كلمة سر المعلم" id="password"><br><br>
+<input placeholder="اسم المادة" id="subject"><br><br>
+<input placeholder="الصف" id="grade"><br><br>
+<input type="number" placeholder="عدد الأسئلة" id="total"><br><br>
+
+<button onclick="create()">إنشاء</button>
+
+<script>
+async function create() {
+  const res = await fetch("/api/teacher/create-exam", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      password: password.value,
+      subject: subject.value,
+      grade: grade.value,
+      totalQuestions: total.value
+    })
+  });
+
+  const data = await res.json();
+  alert("تم إنشاء الامتحان");
+  location.href = "enter-exam.html";
+}
+</script>

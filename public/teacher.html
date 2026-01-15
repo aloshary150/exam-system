@@ -1,79 +1,108 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<title>لوحة تحكم المعلم</title>
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8" />
+  <title>لوحة تحكم المعلم</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="card">
-<h3>تسجيل دخول المعلم</h3>
-<input id="password" type="password" placeholder="كلمة السر" />
-<button onclick="login()">دخول</button>
-<div id="panel" style="display:none; margin-top:20px;">
-<h4>إضافة سؤال جديد</h4>
-<input id="question" placeholder="السؤال" /><br />
-<input id="a0" placeholder="الإجابة 1" /> <input type="radio" name="correct" value="0" /> صحيحة<br />
-<input id="a1" placeholder="الإجابة 2" /> <input type="radio" name="correct" value="1" /> صحيحة<br />
-<input id="a2" placeholder="الإجابة 3" /> <input type="radio" name="correct" value="2" /> صحيحة<br />
-<input id="a3" placeholder="الإجابة 4" /> <input type="radio" name="correct" value="3" /> صحيحة<br />
-<button onclick="addQuestion()">إضافة السؤال</button>
-<p id="message"></p>
-</div>
-</div>
-<script>
-function login() {
-  const pass = document.getElementById("password").value;
-  fetch("/api/teacher/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password: pass }),
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.ok) {
-        document.getElementById("panel").style.display = "block";
-        document.getElementById("password").style.display = "none";
-      } else {
-        alert("كلمة السر خاطئة");
-      }
-    });
-}
+  <div class="container">
+    <h2>لوحة تحكم المعلم</h2>
 
-function addQuestion() {
-  const q = document.getElementById("question").value.trim();
-  const answers = [
-    document.getElementById("a0").value.trim(),
-    document.getElementById("a1").value.trim(),
-    document.getElementById("a2").value.trim(),
-    document.getElementById("a3").value.trim(),
-  ];
-  const radios = document.getElementsByName("correct");
-  let correctIndex = -1;
-  for (const r of radios) {
-    if (r.checked) correctIndex = parseInt(r.value);
-  }
-  if (!q || answers.some(a => !a) || correctIndex === -1) {
-    alert("يرجى ملء كل الحقول وتحديد الإجابة الصحيحة");
-    return;
-  }
-  fetch("/api/teacher/add", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: q, answers, correctIndex }),
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.ok) {
-        document.getElementById("message").innerText = "تم إضافة السؤال بنجاح";
-        document.getElementById("question").value = "";
-        ["a0", "a1", "a2", "a3"].forEach(id => (document.getElementById(id).value = ""));
-        radios.forEach(r => (r.checked = false));
-      } else {
-        alert("حدث خطأ أثناء الإضافة");
+    <input id="password" placeholder="كلمة سر المعلم" type="password" />
+
+    <h3>إدارة الامتحانات</h3>
+    <ul id="examList"></ul>
+
+    <hr />
+
+    <h3>إضافة سؤال لامتحان</h3>
+    <input id="examId" placeholder="رقم الامتحان" readonly />
+    <input id="q" placeholder="السؤال" />
+    <input id="a1" placeholder="إجابة 1" />
+    <input id="a2" placeholder="إجابة 2" />
+    <input id="a3" placeholder="إجابة 3" />
+    <input id="a4" placeholder="إجابة 4" />
+    <input
+      id="correct"
+      type="number"
+      placeholder="رقم الإجابة الصحيحة (0-3)"
+      min="0"
+      max="3"
+    />
+    <button onclick="addQuestion()">إضافة سؤال</button>
+
+    <hr />
+
+    <h3>عرض نتائج الطلاب</h3>
+    <button onclick="loadResults()">عرض النتائج</button>
+    <ul id="results"></ul>
+  </div>
+
+  <script>
+    const passwordInput = document.getElementById("password");
+    const examList = document.getElementById("examList");
+    const examIdInput = document.getElementById("examId");
+    const resultsList = document.getElementById("results");
+
+    passwordInput.addEventListener("input", loadExams);
+
+    async function loadExams() {
+      const password = passwordInput.value.trim();
+      if (!password) {
+        examList.innerHTML = "";
+        return;
       }
-    });
-}
-</script>
-</body>
-</html>
+
+      try {
+        const res = await fetch("/api/exam/list");
+        const exams = await res.json();
+
+        examList.innerHTML = "";
+        exams.forEach((exam) => {
+          const li = document.createElement("li");
+          li.textContent = `${exam.subject} - الصف ${exam.grade} - مدة: ${exam.duration} دقيقة`;
+          const btnDelete = document.createElement("button");
+          btnDelete.textContent = "حذف";
+          btnDelete.style.marginLeft = "10px";
+          btnDelete.onclick = async () => {
+            if (
+              confirm(`هل أنت متأكد من حذف الامتحان: ${exam.subject} - الصف ${exam.grade}؟`)
+            ) {
+              const res = await fetch(`/api/teacher/delete-exam/${exam.id}`, {
+                method: "DELETE",
+                headers: { password },
+              });
+              if (res.ok) {
+                alert("تم الحذف");
+                loadExams();
+              } else {
+                alert("فشل الحذف");
+              }
+            }
+          };
+
+          li.onclick = () => {
+            examIdInput.value = exam.id;
+            alert(
+              `تم اختيار الامتحان: ${exam.subject} - الصف ${exam.grade}\nرقم الامتحان تم تعبئته`
+            );
+          };
+
+          li.appendChild(btnDelete);
+          examList.appendChild(li);
+        });
+      } catch {
+        examList.innerHTML = "خطأ في تحميل الامتحانات";
+      }
+    }
+
+    async function addQuestion() {
+      const password = passwordInput.value.trim();
+      const examId = examIdInput.value.trim();
+      const question = document.getElementById("q").value.trim();
+      const answers = [
+        document.getElementById("a1").value.trim(),
+        document.getElementById("a2").value.trim(),
+        document.getElementById("a3").value.trim(),
+        document.getElementById("a4").value

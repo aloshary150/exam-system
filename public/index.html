@@ -1,23 +1,33 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-<meta charset="UTF-8" />
-<title>امتحان الطلاب</title>
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8">
+  <title>نظام الامتحانات</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 100px; }
+    select, button { padding: 10px; font-size: 16px; }
+  </style>
 </head>
 <body>
-<div class="card">
-<h3>مرحبا بالطالب</h3>
-<input id="name" placeholder="أدخل اسمك" />
-<button onclick="startExam()">ابدأ الامتحان</button>
-</div>
+
+<h2>مرحبًا بك</h2>
+
+<select id="action">
+  <option value="">-- اختر --</option>
+  <option value="create">إنشاء امتحان</option>
+  <option value="enter">دخول امتحان</option>
+</select>
+
+<br><br>
+<button onclick="go()">متابعة</button>
+
 <script>
-function startExam() {
-  const name = document.getElementById("name").value.trim();
-  if (!name) return alert("من فضلك أدخل اسمك");
-  localStorage.setItem("name", name);
-  location.href = "exam.html";
+function go() {
+  const v = document.getElementById("action").value;
+  if (v === "create") location.href = "create-exam.html";
+  if (v === "enter") location.href = "enter-exam.html";
 }
 </script>
+
 </body>
 </html>

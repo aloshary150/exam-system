@@ -6,44 +6,132 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>إنشاء امتحان</header>
-  <div class="container">
-    <input id="password" placeholder="كلمة سر المعلم" type="password" />
-    <input id="subject" placeholder="اسم المادة" />
-    <input id="grade" placeholder="الصف" />
-    <input id="total" type="number" placeholder="عدد الأسئلة" />
-    <input id="duration" type="number" placeholder="مدة الامتحان بالدقائق" />
-    <button onclick="create()">إنشاء</button>
-    <p id="msg" class="error"></p>
-  </div>
-  <script>
-    async function create() {
-      const password = document.getElementById("password").value.trim();
-      const subject = document.getElementById("subject").value.trim();
-      const grade = document.getElementById("grade").value.trim();
-      const totalQuestions = parseInt(document.getElementById("total").value);
-      const duration = parseInt(document.getElementById("duration").value);
-      const msg = document.getElementById("msg");
-      msg.textContent = "";
-      if (!password || !subject || !grade || !totalQuestions || !duration) {
-        msg.textContent = "يرجى تعبئة جميع الحقول";
+
+<header>إنشاء امتحان جديد</header>
+
+<div class="container">
+
+  <!-- بيانات الامتحان -->
+  <input id="password" type="password" placeholder="كلمة سر المعلم" />
+  <input id="subject" placeholder="اسم المادة" />
+  <input id="grade" placeholder="الصف / الفصل" />
+  <input id="duration" type="number" placeholder="مدة الامتحان (دقائق)" />
+  <input id="total" type="number" placeholder="عدد الأسئلة" />
+
+  <button onclick="generateQuestions()">التالي</button>
+
+  <!-- الأسئلة -->
+  <form id="questionsArea"></form>
+
+  <button id="saveBtn" onclick="saveExam()" style="display:none">
+    حفظ الامتحان
+  </button>
+
+  <p id="msg" class="error"></p>
+</div>
+
+<script>
+let examInfo = {};
+
+function generateQuestions() {
+  const password = passwordInput();
+  const subject = subjectInput();
+  const grade = gradeInput();
+  const duration = Number(document.getElementById("duration").value);
+  const total = Number(document.getElementById("total").value);
+  const msg = document.getElementById("msg");
+
+  msg.textContent = "";
+
+  if (!password || !subject || !grade || !duration || !total) {
+    msg.textContent = "يرجى تعبئة جميع بيانات الامتحان";
+    return;
+  }
+
+  examInfo = { password, subject, grade, duration, totalQuestions: total };
+
+  const area = document.getElementById("questionsArea");
+  area.innerHTML = "";
+
+  for (let i = 1; i <= total; i++) {
+    area.innerHTML += `
+      <div class="question-box">
+        <h3>السؤال ${i}</h3>
+        <input id="q${i}" placeholder="نص السؤال" />
+
+        ${[1,2,3,4].map(n => `
+          <label class="answer">
+            <input type="radio" name="correct${i}" value="${n}">
+            <input id="q${i}a${n}" placeholder="إجابة ${n}">
+          </label>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  document.getElementById("saveBtn").style.display = "block";
+}
+
+function passwordInput() {
+  return document.getElementById("password").value.trim();
+}
+function subjectInput() {
+  return document.getElementById("subject").value.trim();
+}
+function gradeInput() {
+  return document.getElementById("grade").value.trim();
+}
+
+async function saveExam() {
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
+
+  const questions = [];
+
+  for (let i = 1; i <= examInfo.totalQuestions; i++) {
+    const text = document.getElementById(`q${i}`).value.trim();
+    const correct = document.querySelector(
+      `input[name="correct${i}"]:checked`
+    );
+
+    if (!text || !correct) {
+      msg.textContent = "يجب كتابة جميع الأسئلة واختيار الإجابة الصحيحة";
+      return;
+    }
+
+    const answers = [];
+    for (let n = 1; n <= 4; n++) {
+      const val = document.getElementById(`q${i}a${n}`).value.trim();
+      if (!val) {
+        msg.textContent = "يرجى تعبئة جميع الإجابات";
         return;
       }
-      const res = await fetch("/api/teacher/create-exam", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, subject, grade, totalQuestions, duration }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("تم إنشاء الامتحان، رقم الامتحان: " + data.id);
-        localStorage.setItem("teacherPassword", password);
-        localStorage.setItem("createdExamId", data.id);
-        location.href = "teacher.html";
-      } else {
-        msg.textContent = data.message || data.error;
-      }
+      answers.push(val);
     }
-  </script>
+
+    questions.push({
+      text,
+      answers,
+      correct: Number(correct.value)
+    });
+  }
+
+  const res = await fetch("/api/teacher/full-create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...examInfo, questions })
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    alert("✅ تم إنشاء الامتحان بنجاح");
+    location.href = "index.html";
+  } else {
+    msg.textContent = data.error || "فشل إنشاء الامتحان";
+  }
+}
+</script>
+
 </body>
 </html>

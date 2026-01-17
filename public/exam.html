@@ -1,126 +1,91 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>الامتحان</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div class="exam-container">
-    <div class="exam-header">
-     <h2>بسم الله الرحمن الرحيم </h2><br>
-      <h1>مؤسسة ابوذر الكودة التعليمية</h1> <br>
-      <br><h1>(رياض - ابتدائي - متوسطة - ثانوي - جامعي) </h1> <br>
-      
-      <button style="font-size:30px;background-color:transparent" id="subject">اسم المادة </button>
-      <button style="font-size:30px;background-color:transparent" id="grade">الصف</button>
-    
-      <div class="timer" id="timer">الوقت المتبقي: --:--</div>
-    </div>
-    <form id="examForm">
-      <!-- الأسئلة ستدخل هنا -->
-    </form>
-    <button onclick="submitExam()">إرسال الامتحان</button>
-    <p id="resultMsg" class="error"></p>
-  </div>
-  <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const examId = urlParams.get("examId");
-    const studentName = localStorage.getItem("studentName");
-    const examForm = document.getElementById("examForm");
-    const subjectEl = document.getElementById("subject");
-    const gradeEl = document.getElementById("grade");
-    const timerEl = document.getElementById("timer");
-    const resultMsg = document.getElementById("resultMsg");
-    let examDuration = 0; // بالدقائق
-    let timerInterval;
-    async function loadExam() {
-      if (!examId || !studentName) {
-        alert("خطأ في بيانات الامتحان أو اسم الطالب");
-        location.href = "enter-exam.html";
-        return;
-      }
-      const res = await fetch(`/api/exam/questions/${examId}`);
-      const data = await res.json();
-      if (!data || !data.questions || data.questions.length === 0) {
-        alert("لا يوجد أسئلة لهذا الامتحان");
-        location.href = "enter-exam.html";
-        return;
-      }
-      subjectEl.textContent = data.examInfo.subject || "المادة";
-      gradeEl.textContent = `الصف ${data.examInfo.grade || ""}`;
-      examDuration = data.examInfo.duration || 10;
-      for (let i = 0; i < data.questions.length; i++) {
-        const q = data.questions[i];
-        const div = document.createElement("div");
-        div.classList.add("question-block");
-        const p = document.createElement("p");
-        p.textContent = `${i + 1}. ${q.question}`;
-        div.appendChild(p);
-        const answersDiv = document.createElement("div");
-        answersDiv.classList.add("answers");
-        q.answers.forEach((ans, idx) => {
-          const label = document.createElement("label");
-          label.innerHTML = `
-            <input type="radio" name="q${q.id}" value="${ans.id}" required />
-            ${ans.answer}
-          `;
-          answersDiv.appendChild(label);
-        });
-        div.appendChild(answersDiv);
-        examForm.appendChild(div);
-      }
-      startTimer(examDuration * 60);
+
+<body class="exam-paper">
+
+<h2 id="examTitle"></h2>
+
+<form id="examForm"></form>
+
+<button onclick="submitExam()">إنهاء الامتحان</button>
+
+<script>
+const params = new URLSearchParams(location.search);
+const examId = params.get("id");
+const studentName = params.get("name");
+
+if (!examId || !studentName) {
+  alert("خطأ في بيانات الامتحان أو اسم الطالب");
+}
+
+/* ===== تحميل الامتحان ===== */
+fetch(`/api/exam/${examId}`)
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("examTitle").innerText =
+      `${data.exam.subject} - ${data.exam.grade}`;
+
+    const form = document.getElementById("examForm");
+
+    data.questions.forEach((q, index) => {
+      const div = document.createElement("div");
+      div.className = "question";
+
+      div.innerHTML = `<p>${index + 1}) ${q.question}</p>`;
+
+      q.answers.forEach((a, i) => {
+        div.innerHTML += `
+          <label class="answer">
+            <input type="radio" name="${q.id}" value="${a.id}">
+            ${["أ","ب","ج","د"][i]} ) ${a.answer}
+          </label>
+        `;
+      });
+
+      form.appendChild(div);
+    });
+  });
+
+/* ===== إرسال الامتحان ===== */
+function submitExam() {
+  const answers = {};
+
+  document
+    .querySelectorAll("input[type=radio]:checked")
+    .forEach(r => {
+      answers[r.name] = r.value;
+    });
+
+  if (Object.keys(answers).length === 0) {
+    alert("يرجى الإجابة على الأسئلة");
+    return;
+  }
+
+  fetch("/api/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      examId,
+      studentName,
+      answers
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) {
+      alert(data.error);
+    } else {
+      alert("درجتك: " + data.score);
+      location.href = "index.html";
     }
-    function startTimer(seconds) {
-      let timeLeft = seconds;
-      timerEl.textContent = `الوقت المتبقي: ${formatTime(timeLeft)}`;
-      timerInterval = setInterval(() => {
-        timeLeft--;
-        timerEl.textContent = `الوقت المتبقي: ${formatTime(timeLeft)}`;
-        if (timeLeft <= 0) {
-          clearInterval(timerInterval);
-          alert("انتهى الوقت! سيتم إرسال الامتحان تلقائيًا.");
-          submitExam();
-        }
-      }, 1000);
-    }
-    function formatTime(s) {
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-    }
-    async function submitExam() {
-      clearInterval(timerInterval);
-      resultMsg.textContent = "";
-      const answers = {};
-      for (const el of examForm.elements) {
-        if (el.checked && el.name.startsWith("q")) {
-          answers[el.name.substring(1)] = el.value;
-        }
-      }
-      if (Object.keys(answers).length !== examForm.querySelectorAll(".question-block").length) {
-        resultMsg.textContent = "يرجى الإجابة على جميع الأسئلة";
-        return;
-      }
-      try {
-        const res = await fetch("/api/exam/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ examId, studentName, answers }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          alert(`تم الإرسال بنجاح. نتيجتك: ${data.score} من ${data.total}`);
-          location.href = "index.html";
-        } else {
-          resultMsg.textContent = data.message || data.error;
-        }
-      } catch {
-        resultMsg.textContent = "حدث خطأ أثناء الإرسال";
-      }
-    }
-    loadExam();
-  </script>
+  });
+}
+</script>
+
 </body>
 </html>

@@ -1,31 +1,59 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <title>نظام الامتحانات</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>دخول امتحان</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>نظام الامتحانات</header>
-  <div class="container">
-    <h2>مرحبًا بك في نظام الامتحانات</h2>
-    <select id="action">
-      <option value="">-- اختر --</option>
-      <option value="create">إنشاء امتحان</option>
-      <option value="enter">دخول امتحان</option>
-      <option value="teacher">لوحة تحكم المعلم</option>
-    </select>
-    <br /><br />
-    <button onclick="go()">متابعة</button>
-  </div>
-  <script>
-    function go() {
-      const v = document.getElementById("action").value;
-      if (v === "create") location.href = "create-exam.html";
-      else if (v === "enter") location.href = "enter-exam.html";
-      else if (v === "teacher") location.href = "teacher.html";
-      else alert("اختر خيارًا");
-    }
-  </script>
+
+<header>دخول امتحان</header>
+
+<div class="container">
+  <input id="studentName" placeholder="اسم الطالب" />
+
+  <select id="examSelect">
+    <option value="">اختر الامتحان</option>
+  </select>
+
+  <button onclick="startExam()">بدء الامتحان</button>
+</div>
+
+<script>
+async function loadExams() {
+  try {
+    const res = await fetch("/api/exams");
+    const exams = await res.json();
+
+    const select = document.getElementById("examSelect");
+
+    exams.forEach(exam => {
+      const option = document.createElement("option");
+      option.value = exam.id;
+      option.textContent =
+        `${exam.subject} - ${exam.grade} (${exam.total_questions} أسئلة)`;
+      select.appendChild(option);
+    });
+
+  } catch (e) {
+    alert("فشل تحميل الامتحانات");
+  }
+}
+
+function startExam() {
+  const examId = document.getElementById("examSelect").value;
+  const name = document.getElementById("studentName").value.trim();
+
+  if (!examId || !name) {
+    alert("يرجى إدخال الاسم واختيار الامتحان");
+    return;
+  }
+
+  location.href = `exam.html?id=${examId}&name=${encodeURIComponent(name)}`;
+}
+
+loadExams();
+</script>
+
 </body>
 </html>

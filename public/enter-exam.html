@@ -1,45 +1,49 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <title>دخول الامتحان</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<title>دخول امتحان</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>دخول الامتحان</header>
-  <div class="container">
-    <input id="studentName" placeholder="اسم الطالب" />
-    <select id="examSelect"></select>
-    <button onclick="startExam()">ابدأ الامتحان</button>
-    <p id="msg" class="error"></p>
-  </div>
-  <script>
-    const examSelect = document.getElementById("examSelect");
-    const msg = document.getElementById("msg");
-    async function loadExams() {
-      const res = await fetch("/api/exam/list");
-      const exams = await res.json();
-      examSelect.innerHTML = '<option value="">-- اختر الامتحان --</option>';
-      exams.forEach((e) => {
-        const opt = document.createElement("option");
-        opt.value = e.id;
-        opt.textContent = `${e.subject} - الصف ${e.grade} - مدة: ${e.duration} دقيقة`;
-        examSelect.appendChild(opt);
-      });
-    }
-    async function startExam() {
-      msg.textContent = "";
-      const studentName = document.getElementById("studentName").value.trim();
-      const examId = examSelect.value;
-      if (!studentName || !examId) {
-        msg.textContent = "يرجى تعبئة الاسم واختيار الامتحان";
-        return;
-      }
-      localStorage.setItem("studentName", studentName);
-      localStorage.setItem("examId", examId);
-      location.href = `exam.html?examId=${examId}`;
-    }
-    loadExams();
-  </script>
+
+<header>دخول امتحان</header>
+
+<div class="container">
+  <input id="studentName" placeholder="اسم الطالب">
+
+  <select id="examSelect">
+    <option value="">اختر الامتحان</option>
+  </select>
+
+  <button onclick="start()">بدء الامتحان</button>
+</div>
+
+<script>
+fetch("/api/exams")
+.then(r=>r.json())
+.then(exams=>{
+  const sel = document.getElementById("examSelect");
+  exams.forEach(e=>{
+    const op = document.createElement("option");
+    op.value = e.id;
+    op.textContent = `${e.subject} - ${e.grade}`;
+    sel.appendChild(op);
+  });
+});
+
+function start(){
+  const name = document.getElementById("studentName").value.trim();
+  const examId = document.getElementById("examSelect").value;
+
+  if (!name || !examId) {
+    alert("أدخل الاسم واختر الامتحان");
+    return;
+  }
+
+  location.href = `exam.html?id=${examId}&name=${encodeURIComponent(name)}`;
+}
+</script>
+
 </body>
 </html>

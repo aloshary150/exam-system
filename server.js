@@ -1,146 +1,177 @@
-const express = require("express");
-const app = express();
-const cors = require("cors");
-const { Pool } = require("pg");
+// server.js
 
+require('dotenv').config(); // تحميل متغيرات البيئة
+const express = require('express');
+const { Pool } = require('pg');
+const cors = require('cors');
+
+const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static('public'));
 
+// إعداد اتصال قاعدة البيانات
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
 });
 
-// إنشاء امتحان (موجود سابقاً)
-// ...
-
-// إضافة سؤال مع إجابات (مع تصحيح مضمون)
-app.post("/api/teacher/add-question", async (req, res) => {
+// إنشاء امتحان جديد
+app.post('/api/teacher/create-exam', async (req, res) => {
+  const { subject, grade, totalQuestions, duration, password } = req.body;
+  if (!subject || !grade || !totalQuestions || !duration || !password) {
+    return res.status(400).json({ error: 'يرجى تعبئة جميع الحقول' });
+  }
   try {
-    const { examId, question, answers, correctIndex } = req.body;
-
-    if (
-      !examId ||
-      !question ||
-      !answers ||
-      answers.length !== 4 ||
-      correctIndex === undefined
-    ) {
-      return res.status(400).json({ error: "بيانات غير مكتملة" });
-    }
-
-    const q = await pool.query(
-      `INSERT INTO questions (exam_id, question)
-       VALUES ($1, $2) RETURNING id`,
-      [examId, question]
+    const result = await pool.query(
+      `INSERT INTO exams(subject, grade, total_questions, duration, password)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [subject, grade, totalQuestions, duration, password]
     );
-
-    for (let i = 0; i < 4; i++) {
-      await pool.query(
-        `INSERT INTO answers (question_id, answer, is_correct)
-         VALUES ($1, $2, $3)`,
-        [q.rows[0].id, answers[i], i === correctIndex]
-      );
-    }
-
-    res.json({ success: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "فشل إضافة السؤال" });
+    res.json({ id: result.rows[0].id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'خطأ في إنشاء الامتحان' });
   }
 });
 
-// جلب أسئلة الامتحان مع إجاباتها
-app.get("/api/teacher/questions/:examId", async (req, res) => {
+// جلب جميع الامتحانات
+app.get('/api/exams', async (req, res) => {
   try {
-    const examId = Number(req.params.examId);
-    const q = await pool.query(
-      `SELECT * FROM questions WHERE exam_id=$1`,
-      [examId]
+    const result = await pool.query('SELECT id, subject, grade FROM exams ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'خطأ في جلب الامتحانات' });
+  }
+});
+
+// إضافة سؤال جديد مع الإجابات
+app.post('/api/teacher/add-question', async (req, res) => {
+  const { examId, question, answers, correctIndex } = req.body;
+  if (!examId || !question || !answers || answers.length !== 4 || correctIndex === undefined) {
+    return res.status(400).json({ error: 'بيانات غير مكتملة' });
+  }
+  try {
+    const qRes = await pool.query(
+      'INSERT INTO questions (exam_id, question) VALUES ($1, $2) RETURNING id',
+      [examId, question]
     );
 
-    for (let row of q.rows) {
-      const a = await pool.query(
-        `SELECT id, answer, is_correct FROM answers WHERE question_id=$1 ORDER BY id`,
-        [row.id]
-      );
-      row.answers = a.rows;
-    }
+    const questionId = qRes.rows[0].id;
 
-    res.json(q.rows);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "فشل جلب الأسئلة" });
+    for (let i = 0; i < 4; i++) {
+      await pool.query(
+        'INSERT INTO answers (question_id, answer, is_correct) VALUES ($1, $2, $3)',
+        [questionId, answers[i], i === correctIndex]
+      );
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'فشل إضافة السؤال' });
+  }
+});
+
+// جلب الأسئلة والإجابات لامتحان معين
+app.get('/api/teacher/questions/:examId', async (req, res) => {
+  const examId = Number(req.params.examId);
+  try {
+    const questionsRes = await pool.query('SELECT * FROM questions WHERE exam_id=$1', [examId]);
+    const questions = questionsRes.rows;
+
+    for (let q of questions) {
+      const answersRes = await pool.query(
+        'SELECT id, answer, is_correct FROM answers WHERE question_id=$1 ORDER BY id',
+        [q.id]
+      );
+      q.answers = answersRes.rows;
+    }
+    res.json(questions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'فشل جلب الأسئلة' });
   }
 });
 
 // تعديل سؤال وإجاباته
-app.put("/api/teacher/update-question/:id", async (req, res) => {
+app.put('/api/teacher/update-question/:id', async (req, res) => {
+  const { question, answers, correctIndex } = req.body;
+  if (!question || !answers || answers.length !== 4 || correctIndex === undefined) {
+    return res.status(400).json({ error: 'بيانات ناقصة' });
+  }
   try {
-    const { question, answers, correctIndex } = req.body;
-
-    if (!question || !answers || answers.length !== 4 || correctIndex === undefined) {
-      return res.status(400).json({ error: "بيانات ناقصة" });
-    }
-
-    await pool.query(
-      `UPDATE questions SET question=$1 WHERE id=$2`,
-      [question, req.params.id]
-    );
-
-    await pool.query(
-      `DELETE FROM answers WHERE question_id=$1`,
-      [req.params.id]
-    );
+    await pool.query('UPDATE questions SET question=$1 WHERE id=$2', [question, req.params.id]);
+    await pool.query('DELETE FROM answers WHERE question_id=$1', [req.params.id]);
 
     for (let i = 0; i < 4; i++) {
       await pool.query(
-        `INSERT INTO answers (question_id, answer, is_correct)
-         VALUES ($1, $2, $3)`,
+        'INSERT INTO answers (question_id, answer, is_correct) VALUES ($1, $2, $3)',
         [req.params.id, answers[i], i === correctIndex]
       );
     }
-
     res.json({ success: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "فشل تعديل السؤال" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'فشل تعديل السؤال' });
   }
 });
 
-// تصحيح الامتحان
-app.post("/api/submit", async (req, res) => {
+// حذف امتحان (مع حذف الأسئلة والإجابات المرتبطة)
+app.delete('/api/teacher/delete-exam/:id', async (req, res) => {
   try {
-    const { examId, studentName, answers } = req.body;
-    let score = 0;
+    await pool.query('DELETE FROM exams WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'فشل حذف الامتحان' });
+  }
+});
 
+// تصحيح الامتحان وحفظ النتيجة
+app.post('/api/submit', async (req, res) => {
+  const { examId, studentName, answers } = req.body;
+  try {
+    let score = 0;
     for (const qId in answers) {
       const chosen = Number(answers[qId]);
-      const c = await pool.query(
-        `SELECT id FROM answers WHERE question_id=$1 AND is_correct=true`,
+      const correctAnsRes = await pool.query(
+        'SELECT id FROM answers WHERE question_id=$1 AND is_correct=true',
         [Number(qId)]
       );
-      if (c.rows.length && chosen === Number(c.rows[0].id)) score++;
+      if (correctAnsRes.rows.length && chosen === Number(correctAnsRes.rows[0].id)) {
+        score++;
+      }
     }
 
     await pool.query(
-      `INSERT INTO results (exam_id, student_name, score)
-       VALUES ($1, $2, $3)`,
+      'INSERT INTO results (exam_id, student_name, score) VALUES ($1, $2, $3)',
       [examId, studentName, score]
     );
 
     res.json({ score });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "خطأ في التصحيح" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'خطأ في التصحيح' });
   }
 });
 
-// بقية الراوتات عندك مثل إنشاء الامتحان، حذف، عرض نتائج الطلبة...
+// عرض نتائج الطلبة لامتحان معين
+app.get('/api/teacher/results/:examId', async (req, res) => {
+  const examId = Number(req.params.examId);
+  try {
+    const resultsRes = await pool.query(
+      'SELECT student_name, score FROM results WHERE exam_id=$1 ORDER BY score DESC',
+      [examId]
+    );
+    res.json(resultsRes.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'خطأ في جلب النتائج' });
+  }
+});
 
-// بدء السيرفر
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });

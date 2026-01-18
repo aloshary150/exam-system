@@ -1,152 +1,104 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <title>لوحة تحكم المعلم</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<title>لوحة تحكم المعلم</title>
+<link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <header>لوحة تحكم المعلم</header>
-  <div class="container">
-    <input id="password" placeholder="كلمة سر المعلم" type="password" />
-    <button onclick="loadExams()">تحميل الامتحانات</button>
-    <h3>الامتحانات</h3>
-    <ul id="examList"></ul>
-    <hr />
-    <h3>إضافة سؤال</h3>
-    <input id="examId" placeholder="رقم الامتحان" readonly />
-    <input id="q" placeholder="السؤال" />
-    <input id="a1" placeholder="إجابة 1" />
-    <input id="a2" placeholder="إجابة 2" />
-    <input id="a3" placeholder="إجابة 3" />
-    <input id="a4" placeholder="إجابة 4" />
-    <input id="correct" type="number" placeholder="رقم الإجابة الصحيحة (0-3)" min="0" max="3" />
-    <button onclick="addQuestion()">إضافة سؤال</button>
-    <hr />
-    <h3>نتائج الطلاب</h3>
-    <button onclick="loadResults()">عرض النتائج</button>
-    <ul id="results"></ul>
-    <p id="msg" class="error"></p>
-  </div>
-  <script>
-    const passwordInput = document.getElementById("password");
-    const examList = document.getElementById("examList");
-    const examIdInput = document.getElementById("examId");
-    const resultsList = document.getElementById("results");
-    const msg = document.getElementById("msg");
-    function clearLists() {
-      examList.innerHTML = "";
-      resultsList.innerHTML = "";
-      msg.textContent = "";
+
+<header>لوحة تحكم المعلم</header>
+
+<div class="container">
+
+  <h3>الامتحانات</h3>
+  <div id="exams"></div>
+
+</div>
+
+<script>
+const examsDiv = document.getElementById("exams");
+
+/* تحميل الامتحانات */
+fetch("/api/exams")
+  .then(r => r.json())
+  .then(exams => {
+    if (exams.length === 0) {
+      examsDiv.innerHTML = "<p>لا توجد امتحانات</p>";
+      return;
     }
-    async function loadExams() {
-      clearLists();
-      const password = passwordInput.value.trim();
-      if (!password) {
-        msg.textContent = "يرجى إدخال كلمة السر";
+
+    exams.forEach(e => {
+      const box = document.createElement("div");
+      box.className = "exam-box";
+
+      box.innerHTML = `
+        <h4>${e.subject} - ${e.grade}</h4>
+        <p>عدد الأسئلة: ${e.total_questions}</p>
+        <p>المدة: ${e.duration} دقيقة</p>
+
+        <button onclick="showResults(${e.id})">📊 النتائج</button>
+        <button onclick="editExam(${e.id}, '${e.subject}', '${e.grade}', ${e.duration})">✏️ تعديل</button>
+        <button class="danger" onclick="deleteExam(${e.id})">🗑 حذف</button>
+
+        <div id="results-${e.id}" class="results"></div>
+      `;
+
+      examsDiv.appendChild(box);
+    });
+  });
+
+/* عرض النتائج */
+function showResults(id){
+  const div = document.getElementById("results-"+id);
+  div.innerHTML = "جارٍ التحميل...";
+
+  fetch("/api/teacher/results/" + id)
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.length === 0){
+        div.innerHTML = "<p>لا توجد نتائج بعد</p>";
         return;
       }
-      try {
-        const res = await fetch("/api/exam/list");
-        const exams = await res.json();
-        exams.forEach((exam) => {
-          const li = document.createElement("li");
-          li.textContent = `${exam.subject} - الصف ${exam.grade} - مدة: ${exam.duration} دقيقة`;
-          const btnDelete = document.createElement("button");
-          btnDelete.textContent = "حذف";
-          btnDelete.style.marginLeft = "10px";
-          btnDelete.onclick = async (e) => {
-            e.stopPropagation();
-            if (
-              confirm(`هل أنت متأكد من حذف الامتحان: ${exam.subject} - الصف ${exam.grade}؟`)
-            ) {
-              const res = await fetch(`/api/teacher/delete-exam/${exam.id}`, {
-                method: "DELETE",
-                headers: { password },
-              });
-              if (res.ok) {
-                alert("تم الحذف");
-                loadExams();
-              } else {
-                alert("فشل الحذف");
-              }
-            }
-          };
-          li.onclick = () => {
-            examIdInput.value = exam.id;
-            alert(`تم اختيار الامتحان: ${exam.subject} - الصف ${exam.grade}\nرقم الامتحان تم تعبئته`);
-          };
-          li.appendChild(btnDelete);
-          examList.appendChild(li);
-        });
-      } catch {
-        msg.textContent = "خطأ في تحميل الامتحانات";
-      }
-    }
-    async function addQuestion() {
-      msg.textContent = "";
-      const password = passwordInput.value.trim();
-      const examId = examIdInput.value.trim();
-      const question = document.getElementById("q").value.trim();
-      const answers = [
-        document.getElementById("a1").value.trim(),
-        document.getElementById("a2").value.trim(),
-        document.getElementById("a3").value.trim(),
-        document.getElementById("a4").value.trim(),
-      ];
-      const correctIndex = parseInt(document.getElementById("correct").value);
-      if (!password || !examId || !question || answers.some((a) => !a) || isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3) {
-        msg.textContent = "يرجى تعبئة جميع الحقول بشكل صحيح";
-        return;
-      }
-      try {
-        const res = await fetch("/api/teacher/add-question", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password, examId, question, answers, correctIndex }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          alert("تمت إضافة السؤال");
-          document.getElementById("q").value = "";
-          document.getElementById("a1").value = "";
-          document.getElementById("a2").value = "";
-          document.getElementById("a3").value = "";
-          document.getElementById("a4").value = "";
-          document.getElementById("correct").value = "";
-        } else {
-          msg.textContent = data.message || data.error;
-        }
-      } catch (err) {
-        msg.textContent = "حدث خطأ أثناء الإضافة";
-      }
-    }
-    async function loadResults() {
-      resultsList.innerHTML = "";
-      msg.textContent = "";
-      const password = passwordInput.value.trim();
-      if (!password) {
-        msg.textContent = "يرجى إدخال كلمة السر";
-        return;
-      }
-      try {
-        const res = await fetch("/api/teacher/results", {
-          headers: { password },
-        });
-        const results = await res.json();
-        if (results.length === 0) {
-          resultsList.textContent = "لا توجد نتائج بعد";
-          return;
-        }
-        results.forEach((r) => {
-          const li = document.createElement("li");
-          li.textContent = `${r.name} - مادة: ${r.subject} - النتيجة: ${r.score} / ${r.total}`;
-          resultsList.appendChild(li);
-        });
-      } catch {
-        msg.textContent = "خطأ في تحميل النتائج";
-      }
-    }
-  </script>
+
+      let html = "<table><tr><th>الطالب</th><th>الدرجة</th></tr>";
+      data.forEach(s=>{
+        html += `<tr><td>${s.student_name}</td><td>${s.score}</td></tr>`;
+      });
+      html += "</table>";
+
+      div.innerHTML = html;
+    });
+}
+
+/* حذف امتحان */
+function deleteExam(id){
+  if(!confirm("هل أنت متأكد من حذف الامتحان؟")) return;
+
+  fetch("/api/teacher/delete-exam/" + id, { method:"DELETE" })
+    .then(()=>location.reload());
+}
+
+/* تعديل امتحان */
+function editExam(id, subject, grade, duration){
+  const newSubject = prompt("اسم المادة:", subject);
+  const newGrade = prompt("الصف:", grade);
+  const newDuration = prompt("المدة:", duration);
+
+  if(!newSubject || !newGrade || !newDuration) return;
+
+  fetch("/api/teacher/update-exam/" + id, {
+    method:"PUT",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      subject:newSubject,
+      grade:newGrade,
+      duration:newDuration
+    })
+  }).then(()=>location.reload());
+}
+</script>
+
 </body>
 </html>

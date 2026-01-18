@@ -1,58 +1,40 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>دخول امتحان</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>نظام الامتحانات</title>
+<link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<header>دخول امتحان</header>
+<header>نظام الامتحانات الإلكترونية</header>
 
-<div class="container">
-  <input id="studentName" placeholder="اسم الطالب" />
+<div class="container home">
 
-  <select id="examSelect">
-    <option value="">اختر الامتحان</option>
-  </select>
+  <button onclick="location.href='enter-exam.html'">
+    ✍️ دخول امتحان (طالب)
+  </button>
 
-  <button onclick="startExam()">بدء الامتحان</button>
+  <button onclick="location.href='create-exam.html'">
+    ➕ إنشاء امتحان (معلم)
+  </button>
+
+  <button onclick="teacherControl()">
+    ⚙️ تحكم المعلم
+  </button>
+
 </div>
 
 <script>
-async function loadExams() {
-  try {
-    const res = await fetch("/api/exams");
-    const exams = await res.json();
-
-    const select = document.getElementById("examSelect");
-
-    exams.forEach(exam => {
-      const option = document.createElement("option");
-      option.value = exam.id;
-      option.textContent =
-        `${exam.subject} - ${exam.grade} (${exam.total_questions} أسئلة)`;
-      select.appendChild(option);
-    });
-
-  } catch (e) {
-    alert("فشل تحميل الامتحانات");
+function teacherControl(){
+  const pass = prompt("أدخل كلمة سر المعلم:");
+  if(pass === "aloshary150"){
+    location.href = "teacher.html";
+  } else if(pass !== null){
+    alert("كلمة السر غير صحيحة");
   }
 }
-
-function startExam() {
-  const examId = document.getElementById("examSelect").value;
-  const name = document.getElementById("studentName").value.trim();
-
-  if (!examId || !name) {
-    alert("يرجى إدخال الاسم واختيار الامتحان");
-    return;
-  }
-
-  location.href = `exam.html?id=${examId}&name=${encodeURIComponent(name)}`;
-}
-
-loadExams();
 </script>
 
 </body>

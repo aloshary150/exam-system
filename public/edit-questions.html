@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تعديل أسئلة الامتحان</title>
+  <style>
+    body { font-family: Tahoma, Arial; max-width: 900px; margin: 20px auto; background: #fff; }
+    header { background: #ff7a00; color: white; padding: 15px; text-align: center; font-size: 22px; }
+    .question { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+    input[type=text] { width: 100%; padding: 8px; margin: 5px 0 12px; box-sizing: border-box; }
+    label { display: block; margin: 5px 0; cursor: pointer; }
+    .answers { margin-bottom: 12px; }
+    button { background: #ff7a00; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 5px; }
+  </style>
+</head>
+<body>
+
+<header>تعديل أسئلة الامتحان</header>
+
+<div id="questions-container"></div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const examId = params.get("examId");
+  const container = document.getElementById("questions-container");
+
+  if (!examId) {
+    container.innerHTML = "<p>رقم الامتحان غير موجود في الرابط.</p>";
+    throw new Error("Missing examId");
+  }
+
+  // تحميل الأسئلة
+  fetch("/api/teacher/questions/" + examId)
+    .then(r => r.json())
+    .then(questions => {
+      if (!questions.length) {
+        container.innerHTML = "<p>لا توجد أسئلة لهذا الامتحان.</p>";
+        return;
+      }
+      questions.forEach(q => renderQuestion(q));
+    })
+    .catch(() => {
+      container.innerHTML = "<p>حدث خطأ أثناء جلب الأسئلة.</p>";
+    });
+
+  function renderQuestion(q) {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `
+      <input type="text" value="${escapeHtml(q.question)}" placeholder="نص السؤال" id="question-${q.id}"/>
+      <div class="answers">
+        ${q.answers.map((a, i) => `
+          <label>
+            <input type="radio" name="correct-${q.id}" value="${i}" ${a.is_correct ? "checked" : ""} />
+            <input type="text" value="${escapeHtml(a.answer)}" placeholder="الإجابة ${String.fromCharCode(65 + i)}" id="answer-${q.id}-${i}" />
+          </label>
+        `).join("")}
+      </div>
+      <button onclick="saveQuestion(${q.id})">حفظ السؤال</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+               .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  async function saveQuestion(id) {
+    const questionText = document.getElementById(`question-${id}`).value.trim();
+    const answers = [];
+    const radios = document.getElementsByName(`correct-${id}`);
+    let correctIndex = -1;
+
+    for (let i = 0; i < 4; i++) {
+      const answerInput = document.getElementById(`answer-${id}-${i}`);
+      if (!answerInput) continue;
+      answers.push(answerInput.value.trim());
+      if (radios[i].checked) correctIndex = i;
+    }
+
+    if (!questionText || answers.some(a => !a) || correctIndex === -1) {
+      alert("يرجى تعبئة السؤال، كل الإجابات، وتحديد الإجابة الصحيحة.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/teacher/update-question/" + id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: questionText, answers, correctIndex })
+      });
+      if (res.ok) alert("تم حفظ السؤال");
+      else alert("حدث خطأ أثناء الحفظ");
+    } catch {
+      alert("حدث خطأ أثناء الحفظ");
+    }
+  }
+</script>
+
+</body>
+</html>

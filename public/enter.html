@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>دخول امتحان</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>دخول امتحان</h2>
+<input id="name" placeholder="اسم الطالب"><br>
+<select id="exam"></select>
+<button onclick="start()">بدء</button>
+
+<div id="examBox"></div>
+
+<script>
+async function load(){
+  const r = await fetch("/api/exams");
+  const d = await r.json();
+  d.forEach(e=>{
+    exam.innerHTML+=`<option value="${e.id}">${e.subject} - ${e.grade}</option>`;
+  });
+}
+load();
+
+async function start(){
+  const r = await fetch("/api/exam/"+exam.value);
+  const qs = await r.json();
+  examBox.innerHTML="<form onsubmit='submitExam(event)'>";
+  qs.forEach((q,i)=>{
+    examBox.innerHTML+=`<p>${i+1}) ${q.question}</p>`;
+    q.answers.forEach(a=>{
+      examBox.innerHTML+=`
+        <label>
+        <input type="radio" name="${q.id}" value="${a.id}">${a.answer}
+        </label><br>`;
+    });
+  });
+  examBox.innerHTML+=`<button>إرسال</button></form>`;
+}
+
+async function submitExam(e){
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const ans={};
+  for(let [k,v] of f) ans[k]=v;
+
+  const r=await fetch("/api/submit",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({examId:exam.value,name:name.value,answers:ans})
+  });
+  alert("درجتك: "+(await r.json()).score);
+}
+</script>
+</body>
+</html>

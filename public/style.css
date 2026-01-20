@@ -4,7 +4,7 @@ body {
   background: #fff3e0;
 }
 header {
-  background-color: #ff6600;
+  background-color: blue;
   color: white;
   padding: 15px 20px;
   text-align: center;
@@ -15,7 +15,7 @@ header {
   max-width: 600px;
   margin: 30px auto;
   padding: 20px;
-  background: #fff3e0;
+  background: blue;
   border-radius: 8px;
   box-shadow: 0 0 10px #ff9933aa;
 }

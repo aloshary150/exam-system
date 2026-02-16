@@ -1,100 +1,63 @@
-require("dotenv").config();
-const express = require("express");
-const { Pool } = require("pg");
-
+const express = require('express');
 const app = express();
+const cors = require('cors');
+const { Pool } = require('pg');
+
+app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: 'postgresql://exam_db_lmja_user:JfFTkmXH2gKXdb1pWhbPdpJRIPzCmMzf@dpg-d5ja4vili9vc73as6j70-a.virginia-postgres.render.com/exam_db_lmja',
+  ssl: { rejectUnauthorized: false }
 });
 
-/* ================== امتحانات ================== */
+// ==== API Routes ====
 
-// إنشاء امتحان
-app.post("/api/create-exam", async (req, res) => {
-  const { subject, grade, totalQuestions, duration, password } = req.body;
-  if (password !== "aloshary150")
-    return res.status(403).json({ error: "كلمة السر خطأ" });
-
-  const r = await pool.query(
-    `INSERT INTO exams(subject, grade, total_questions, duration)
-     VALUES ($1,$2,$3,$4) RETURNING id`,
-    [subject, grade, totalQuestions, duration]
-  );
-
-  res.json({ id: r.rows[0].id });
+// جلب جميع الامتحانات
+app.get('/api/exams', async (req,res)=>{
+  const result = await pool.query('SELECT * FROM exams ORDER BY id');
+  res.json(result.rows);
 });
 
-// جلب الامتحانات
-app.get("/api/exams", async (_, res) => {
-  const r = await pool.query(
-    "SELECT id, subject, grade FROM exams ORDER BY id DESC"
-  );
-  res.json(r.rows);
+// جلب الأسئلة لامتحان معين
+app.get('/api/exams/:id/questions', async (req,res)=>{
+  const exam_id = req.params.id;
+  const result = await pool.query('SELECT * FROM questions WHERE exam_id=$1 ORDER BY id', [exam_id]);
+  res.json(result.rows);
 });
 
-/* ================== الأسئلة ================== */
-
-app.post("/api/add-question", async (req, res) => {
-  const { examId, question, answers, correct } = req.body;
-
-  const q = await pool.query(
-    "INSERT INTO questions(exam_id,question) VALUES($1,$2) RETURNING id",
-    [examId, question]
-  );
-
-  for (let i = 0; i < 4; i++) {
+// إنشاء امتحان جديد مع الأسئلة
+app.post('/api/exams', async (req,res)=>{
+  const { password, name, duration, questions } = req.body;
+  if(password !== '1234') return res.status(403).json({error:'كلمة سر خاطئة'});
+  const examResult = await pool.query('INSERT INTO exams(name,duration) VALUES($1,$2) RETURNING id', [name,duration]);
+  const exam_id = examResult.rows[0].id;
+  for(const q of questions){
     await pool.query(
-      "INSERT INTO answers(question_id,answer,is_correct) VALUES($1,$2,$3)",
-      [q.rows[0].id, answers[i], i === correct]
+      'INSERT INTO questions(exam_id,text,option1,option2,option3,option4,correct) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [exam_id,q.text,q.options[0],q.options[1],q.options[2],q.options[3],q.correct]
     );
   }
-
-  res.json({ ok: true });
+  res.json({success:true});
 });
 
-// جلب أسئلة امتحان
-app.get("/api/exam/:id", async (req, res) => {
-  const qs = await pool.query(
-    "SELECT * FROM questions WHERE exam_id=$1",
-    [req.params.id]
-  );
-
-  for (let q of qs.rows) {
-    const a = await pool.query(
-      "SELECT id,answer FROM answers WHERE question_id=$1",
-      [q.id]
-    );
-    q.answers = a.rows;
-  }
-  res.json(qs.rows);
+// حفظ نتيجة طالب
+app.post('/api/results', async (req,res)=>{
+  const { exam_id, name, score, total } = req.body;
+  await pool.query('INSERT INTO student_results(exam_id,name,score,total) VALUES($1,$2,$3,$4)', [exam_id,name,score,total]);
+  res.json({success:true});
 });
 
-/* ================== تصحيح ================== */
-
-app.post("/api/submit", async (req, res) => {
-  const { examId, name, answers } = req.body;
-  let score = 0;
-
-  for (let qId in answers) {
-    const c = await pool.query(
-      "SELECT id FROM answers WHERE question_id=$1 AND is_correct=true",
-      [qId]
-    );
-    if (c.rows[0] && Number(answers[qId]) === c.rows[0].id) score++;
-  }
-
-  await pool.query(
-    "INSERT INTO results(exam_id,student_name,score) VALUES($1,$2,$3)",
-    [examId, name, score]
-  );
-
-  res.json({ score });
+// جلب جميع النتائج
+app.get('/api/results', async (req,res)=>{
+  const result = await pool.query(`
+    SELECT sr.name, e.name as exam, sr.score, sr.total 
+    FROM student_results sr 
+    JOIN exams e ON sr.exam_id=e.id
+    ORDER BY sr.id
+  `);
+  res.json(result.rows);
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log("Server running")
-);
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));

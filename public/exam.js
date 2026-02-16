@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api'; // عدل للـ Render URL بعد النشر
+const API_URL = 'https://exam-system-tm6q.onrender.com/api'; // عدل للـ Render URL بعد النشر
 
 document.addEventListener('DOMContentLoaded', async () => {
 const teacherPanel = document.getElementById('teacher-panel');

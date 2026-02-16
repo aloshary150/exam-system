@@ -2,61 +2,26 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const { Pool } = require('pg');
+const path = require('path');
 
 app.use(cors());
 app.use(express.json());
 
+// PostgreSQL
 const pool = new Pool({
   connectionString: 'postgresql://exam_db_lmja_user:JfFTkmXH2gKXdb1pWhbPdpJRIPzCmMzf@dpg-d5ja4vili9vc73as6j70-a.virginia-postgres.render.com/exam_db_lmja',
   ssl: { rejectUnauthorized: false }
 });
 
 // ==== API Routes ====
+// ... ضع هنا كل الـ API كما في النسخة السابقة
 
-// جلب جميع الامتحانات
-app.get('/api/exams', async (req,res)=>{
-  const result = await pool.query('SELECT * FROM exams ORDER BY id');
-  res.json(result.rows);
-});
+// ==== Serve static files ====
+app.use(express.static(path.join(__dirname,'public')));
 
-// جلب الأسئلة لامتحان معين
-app.get('/api/exams/:id/questions', async (req,res)=>{
-  const exam_id = req.params.id;
-  const result = await pool.query('SELECT * FROM questions WHERE exam_id=$1 ORDER BY id', [exam_id]);
-  res.json(result.rows);
-});
-
-// إنشاء امتحان جديد مع الأسئلة
-app.post('/api/exams', async (req,res)=>{
-  const { password, name, duration, questions } = req.body;
-  if(password !== '1234') return res.status(403).json({error:'كلمة سر خاطئة'});
-  const examResult = await pool.query('INSERT INTO exams(name,duration) VALUES($1,$2) RETURNING id', [name,duration]);
-  const exam_id = examResult.rows[0].id;
-  for(const q of questions){
-    await pool.query(
-      'INSERT INTO questions(exam_id,text,option1,option2,option3,option4,correct) VALUES($1,$2,$3,$4,$5,$6,$7)',
-      [exam_id,q.text,q.options[0],q.options[1],q.options[2],q.options[3],q.correct]
-    );
-  }
-  res.json({success:true});
-});
-
-// حفظ نتيجة طالب
-app.post('/api/results', async (req,res)=>{
-  const { exam_id, name, score, total } = req.body;
-  await pool.query('INSERT INTO student_results(exam_id,name,score,total) VALUES($1,$2,$3,$4)', [exam_id,name,score,total]);
-  res.json({success:true});
-});
-
-// جلب جميع النتائج
-app.get('/api/results', async (req,res)=>{
-  const result = await pool.query(`
-    SELECT sr.name, e.name as exam, sr.score, sr.total 
-    FROM student_results sr 
-    JOIN exams e ON sr.exam_id=e.id
-    ORDER BY sr.id
-  `);
-  res.json(result.rows);
+// كل طلب غير الـ API يرسل index.html
+app.get(/^\/(?!api).*/, (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','index.html'));
 });
 
 const PORT = process.env.PORT || 5000;

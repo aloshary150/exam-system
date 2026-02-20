@@ -2,38 +2,24 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>نظام امتحانات متعدد الخيارات</title>
+<title>نظام الامتحانات</title>
 <style>
-body { font-family: Arial; background:#f0f4f8; padding:20px; }
-h1 { text-align:center; color:#1d4ed8; }
-button { background:#2563eb;color:#fff;border:none;padding:8px 12px;margin:5px;border-radius:5px;cursor:pointer; }
-button:hover{background:#1d4ed8;}
-input, select { padding:5px; margin:2px 0; width:250px; border-radius:4px; border:1px solid #ccc;}
-.question { background:#fff; padding:10px; margin-bottom:10px; border-radius:5px; }
-#timer { font-weight:bold; color:red; margin-top:10px; }
-.hidden{display:none;}
+body{font-family:Arial;background:#f3f4f6;text-align:center;direction:rtl}
+button{padding:10px 20px;margin:5px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer}
+.card{background:white;padding:20px;margin:20px auto;width:90%;max-width:700px;border-radius:12px;box-shadow:0 0 10px #ccc}
+input,textarea{padding:8px;margin:5px;width:90%}
 </style>
 </head>
 <body>
-<h1>نظام امتحانات متعدد الخيارات</h1>
 
-<button id="btnTeacherLogin">لوحة المعلم</button>
-<div id="teacher-panel" class="hidden">
-<h2>لوحة المعلم</h2>
-<button id="btnCreateExam">إنشاء امتحان جديد</button>
-<button id="btnShowResults">عرض نتائج جميع الطلاب</button>
-<div id="exam-list"></div>
-<div id="edit-exam"></div>
+<h2>📘 منصة الامتحانات</h2>
+
+<div>
+<button onclick="teacher()">لوحة المعلم</button>
+<button onclick="loadExams()">دخول الطالب</button>
 </div>
 
-<div id="student-panel">
-<h2>لوحة الطالب</h2>
-<label>اختر الامتحان: <select id="select-exam"></select></label><br><br>
-<label>الاسم: <input type="text" id="student-name"></label><br>
-<button id="btnStartExam">ابدأ الامتحان</button>
-<div id="timer"></div>
-<div id="exam-form"></div>
-</div>
+<div id="app" class="card"></div>
 
 <script src="exam.js"></script>
 </body>

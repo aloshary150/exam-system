@@ -1,146 +1,49 @@
-// ضع هنا رابط Render الخاص بك
-const API_URL = 'https://exam-system-jjtc.onrender.com/api';
+let questions = [];
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const teacherPanel = document.getElementById('teacher-panel');
-  const studentPanel = document.getElementById('student-panel');
+function addQuestion() {
+  const q = document.getElementById("question").value;
+  const a = document.getElementById("answer").value;
 
-  // ==== Helpers ====
-  async function getExams() {
-    const res = await fetch(`${API_URL}/exams`);
-    return await res.json();
+  if (!q || !a) {
+    alert("اكتب السؤال والإجابة");
+    return;
   }
 
-  async function getQuestions(exam_id) {
-    const res = await fetch(`${API_URL}/exams/${exam_id}/questions`);
-    return await res.json();
+  questions.push({ q, a });
+
+  const li = document.createElement("li");
+  li.innerText = q + " → " + a;
+  document.getElementById("list").appendChild(li);
+
+  document.getElementById("question").value = "";
+  document.getElementById("answer").value = "";
+}
+
+async function saveExam() {
+  const title = document.getElementById("title").value;
+
+  if (!title || questions.length === 0) {
+    alert("أدخل عنوان وأسئلة");
+    return;
   }
 
-  async function saveResult(exam_id, name, score, total) {
-    await fetch(`${API_URL}/results`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({exam_id, name, score, total})
-    });
+  const res = await fetch("/save-exam", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      title,
+      questions,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    alert("✅ تم حفظ الامتحان");
+    location.reload();
+  } else {
+    alert("❌ فشل الحفظ");
   }
-
-  async function getResults() {
-    const res = await fetch(`${API_URL}/results`);
-    return await res.json();
-  }
-
-  // ==== لوحة المعلم ====
-  document.getElementById('btnTeacherLogin').onclick = () => {
-    const pass = prompt('ادخل كلمة سر المعلم');
-    if(pass==='1234') teacherPanel.classList.remove('hidden');
-    else alert('كلمة سر خاطئة');
-  }
-
-  async function renderExamOptions() {
-    const select = document.getElementById('select-exam');
-    const exams = await getExams();
-    select.innerHTML = exams.map((e,i)=>`<option value="${e.id}">${e.name}</option>`).join('');
-  }
-
-  async function renderExamList() {
-    const exams = await getExams();
-    const listDiv = document.getElementById('exam-list');
-    listDiv.innerHTML = exams.map((e)=>`<div><strong>${e.name} (مدة: ${e.duration} دقيقة)</strong></div>`).join('');
-    renderExamOptions();
-  }
-
-  // عرض نتائج جميع الطلاب
-  document.getElementById('btnShowResults').onclick = async () => {
-    const editDiv = document.getElementById('edit-exam'); editDiv.innerHTML='';
-    const results = await getResults();
-    if(results.length===0){ editDiv.textContent='لا توجد نتائج بعد'; return; }
-    editDiv.innerHTML = results.map((r,i)=>`<div>${i+1}. ${r.name} - ${r.exam} : ${r.score}/${r.total}</div>`).join('');
-  }
-
-  // إنشاء امتحان جديد
-  document.getElementById('btnCreateExam').onclick = async () => {
-    const editDiv = document.getElementById('edit-exam'); editDiv.innerHTML='';
-    const nameInput = document.createElement('input'); nameInput.placeholder='اسم الامتحان';
-    const durationInput = document.createElement('input'); durationInput.type='number'; durationInput.placeholder='مدة الامتحان بالدقائق';
-    const numQInput = document.createElement('input'); numQInput.type='number'; numQInput.placeholder='عدد الأسئلة';
-    const nextBtn = document.createElement('button'); nextBtn.textContent='التالي';
-    editDiv.append(nameInput,durationInput,numQInput,nextBtn);
-
-    nextBtn.onclick = async () => {
-      const name = nameInput.value.trim();
-      const duration = parseInt(durationInput.value)||0;
-      const numQ = parseInt(numQInput.value);
-      if(!name||isNaN(numQ)||numQ<=0){ alert('أدخل اسم وعدد صحيح للأسئلة'); return; }
-
-      editDiv.innerHTML='<h3>إنشاء الامتحان</h3>';
-      const questions = [];
-      for(let i=0;i<numQ;i++){
-        const qDiv = document.createElement('div'); qDiv.className='question';
-        qDiv.innerHTML=`<strong>السؤال ${i+1}</strong><br>
-        <input type="text" placeholder="نص السؤال"><br>
-        ${[0,1,2,3].map(j=>`<input type="text" placeholder="خيار ${j+1}"><br>`).join('')}
-        <label>صحيح: <select>${[0,1,2,3].map(j=>`<option value="${j}">${j+1}</option>`).join('')}</select></label>`;
-        editDiv.appendChild(qDiv);
-        questions.push({text:'',options:['','','',''],correct:0});
-        const inputs=qDiv.querySelectorAll('input[type=text]');
-        inputs.forEach((input,j)=>{ input.onchange=()=>{ if(j===0) questions[i].text=input.value; else questions[i].options[j-1]=input.value; }; });
-        const sel=qDiv.querySelector('select'); sel.onchange=()=>{ questions[i].correct=parseInt(sel.value); };
-      }
-
-      const saveBtn = document.createElement('button'); saveBtn.textContent='حفظ الامتحان';
-      saveBtn.onclick = async () => {
-        const payload = {password:'1234',name,duration,questions};
-        const res = await fetch(`${API_URL}/exams`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        if(res.ok){ alert('تم حفظ الامتحان'); editDiv.innerHTML=''; renderExamList(); }
-      }
-      editDiv.appendChild(saveBtn);
-    }
-  }
-
-  // ==== لوحة الطالب ====
-  document.getElementById('btnStartExam').onclick = async () => {
-    const exam_id = document.getElementById('select-exam').value;
-    const studentName = document.getElementById('student-name').value.trim();
-    if(!studentName) return alert('ادخل اسمك');
-    const examQuestions = await getQuestions(exam_id);
-    const formDiv = document.getElementById('exam-form'); formDiv.innerHTML='';
-    const timerDiv = document.getElementById('timer'); timerDiv.textContent='';
-    const duration = examQuestions.length>0? 5*60:0; // مؤقت افتراضي 5 دقائق
-    let timeLeft = duration;
-
-    examQuestions.forEach((q,i)=>{
-      const qDiv = document.createElement('div'); qDiv.className='question';
-      qDiv.innerHTML = `<strong>${i+1}. ${q.text}</strong><br>` + 
-        [q.option1,q.option2,q.option3,q.option4].map((o,j)=>`<label><input type="radio" name="q${i}" value="${j}"> ${o}</label><br>`).join('');
-      formDiv.appendChild(qDiv);
-    });
-
-    const submitBtn = document.createElement('button'); submitBtn.textContent='عرض النتيجة';
-    formDiv.appendChild(submitBtn);
-
-    let timerInterval=null;
-    if(timeLeft>0){
-      timerDiv.textContent=`الوقت المتبقي: ${Math.floor(timeLeft/60)}:${("0"+(timeLeft%60)).slice(-2)}`;
-      timerInterval=setInterval(()=>{
-        timeLeft--; timerDiv.textContent=`الوقت المتبقي: ${Math.floor(timeLeft/60)}:${("0"+(timeLeft%60)).slice(-2)}`;
-        if(timeLeft<=0){ clearInterval(timerInterval); submitBtn.click(); }
-      },1000);
-    }
-
-    submitBtn.onclick = async () => {
-      if(timerInterval) clearInterval(timerInterval);
-      let score=0;
-      examQuestions.forEach((q,i)=>{
-        const sel = document.querySelector(`input[name=q${i}]:checked`);
-        if(sel && parseInt(sel.value) === q.correct) score++;
-      });
-      formDiv.innerHTML=`${studentName} حصل على ${score} من ${examQuestions.length}`;
-      timerDiv.textContent='';
-      await saveResult(exam_id,studentName,score,examQuestions.length);
-    }
-  }
-
-  // ==== render list and options on load ====
-  renderExamList();
-  renderExamOptions();
-});
+}

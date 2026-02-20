@@ -1,132 +1,68 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const express = require("express");
-const cors = require("cors");
 const { Pool } = require("pg");
 const path = require("path");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-// ===== PostgreSQL =====
+app.use(express.json());
+app.use(express.static(__dirname));
+
+/* ===== PostgreSQL Render Connection ===== */
 const pool = new Pool({
-  connectionString:
-    "postgresql://exam_ybym_user:FmOIq9VYLFjiSGPmUcdDvbtthyeUWPev@dpg-d6c5c5rh46gs738f0ie0-a/exam_ybym",
+  connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
-    
-// ===== إنشاء الجداول تلقائياً =====
+
+/* ===== Create Table Automatically ===== */
 async function initDB() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS exams(
+    CREATE TABLE IF NOT EXISTS exams (
       id SERIAL PRIMARY KEY,
-      name TEXT,
-      duration INT
-    );
-
-    CREATE TABLE IF NOT EXISTS questions(
-      id SERIAL PRIMARY KEY,
-      exam_id INT REFERENCES exams(id) ON DELETE CASCADE,
-      text TEXT,
-      option1 TEXT,
-      option2 TEXT,
-      option3 TEXT,
-      option4 TEXT,
-      correct INT
-    );
-
-    CREATE TABLE IF NOT EXISTS results(
-      id SERIAL PRIMARY KEY,
-      exam_id INT,
-      student TEXT,
-      score INT,
-      total INT
+      title TEXT,
+      questions JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
   console.log("✅ Database Ready");
 }
+
 initDB();
 
+/* ===== SAVE EXAM ===== */
+app.post("/save-exam", async (req, res) => {
+  try {
+    const { title, questions } = req.body;
 
-// ===== API =====
-
-// كل الامتحانات
-app.get("/api/exams", async (req, res) => {
-  const data = await pool.query("SELECT * FROM exams ORDER BY id DESC");
-  res.json(data.rows);
-});
-
-// أسئلة امتحان
-app.get("/api/questions/:id", async (req, res) => {
-  const data = await pool.query(
-    "SELECT * FROM questions WHERE exam_id=$1",
-    [req.params.id]
-  );
-  res.json(data.rows);
-});
-
-// إنشاء امتحان
-app.post("/api/exam", async (req, res) => {
-  const { password, name, duration, questions } = req.body;
-
-  if (password !== "1234")
-    return res.status(403).json({ error: "كلمة سر خاطئة" });
-
-  const exam = await pool.query(
-    "INSERT INTO exams(name,duration) VALUES($1,$2) RETURNING id",
-    [name, duration]
-  );
-
-  const exam_id = exam.rows[0].id;
-
-  for (let q of questions) {
     await pool.query(
-      `INSERT INTO questions
-      (exam_id,text,option1,option2,option3,option4,correct)
-      VALUES($1,$2,$3,$4,$5,$6,$7)`,
-      [
-        exam_id,
-        q.text,
-        q.options[0],
-        q.options[1],
-        q.options[2],
-        q.options[3],
-        q.correct,
-      ]
+      "INSERT INTO exams (title, questions) VALUES ($1,$2)",
+      [title, JSON.stringify(questions)]
     );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ success: false });
   }
-
-  res.json({ success: true });
 });
 
-// حفظ نتيجة
-app.post("/api/result", async (req, res) => {
-  const { exam_id, student, score, total } = req.body;
-
-  await pool.query(
-    "INSERT INTO results(exam_id,student,score,total) VALUES($1,$2,$3,$4)",
-    [exam_id, student, score, total]
+/* ===== GET EXAMS ===== */
+app.get("/exams", async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM exams ORDER BY id DESC"
   );
-
-  res.json({ success: true });
+  res.json(result.rows);
 });
 
-// عرض النتائج
-app.get("/api/results", async (req, res) => {
-  const data = await pool.query("SELECT * FROM results ORDER BY id DESC");
-  res.json(data.rows);
+/* ===== INDEX ===== */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
+const PORT = process.env.PORT || 3000;
 
-// ===== تشغيل الموقع =====
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+app.listen(PORT, () => {
+  console.log("🚀 Server Running");
 });
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log("🚀 Server Running"));

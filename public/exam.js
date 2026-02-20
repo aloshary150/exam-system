@@ -1,5 +1,5 @@
 // ضع هنا رابط Render الخاص بك
-const API_URL = 'https://exam-system-tm6q.onrender.com/api';
+const API_URL = 'https://exam-system-jjtc.onrender.com/api';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const teacherPanel = document.getElementById('teacher-panel');

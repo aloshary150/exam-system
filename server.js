@@ -1,3 +1,4 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
@@ -10,10 +11,12 @@ app.use(express.json());
 // ===== PostgreSQL =====
 const pool = new Pool({
   connectionString:
-    "postgresql://exam_ybym_user:FmOIq9VYLFjiSGPmUcdDvbtthyeUWPev@dpg-d6c5c5rh46gs738f0ie0-a/exam_ybym?ssl=true",
-  ssl: { rejectUnauthorized: false },
+    "postgresql://exam_ybym_user:FmOIq9VYLFjiSGPmUcdDvbtthyeUWPev@dpg-d6c5c5rh46gs738f0ie0-a/exam_ybym",
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
-
+    
 // ===== إنشاء الجداول تلقائياً =====
 async function initDB() {
   await pool.query(`
